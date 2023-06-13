@@ -22,6 +22,8 @@
     {
       devShells = forAllSystems ({ pkgs }: {
         default = pkgs.mkShell {
+          RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
+
           packages = (with pkgs; [
             rustToolchain
           ]) ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (with pkgs; [ libiconv ]);
