@@ -1,9 +1,14 @@
+use std::f32::consts::PI;
+
 use glam::{UVec2, Vec2, Vec3};
 use image::{Rgb, RgbImage};
+use rand::random;
 
 #[derive(Clone)]
 struct Material {
     colour: Vec3,
+    emission_colour: Vec3,
+    emission_strength: f32,
 }
 
 struct Sphere {
@@ -12,6 +17,7 @@ struct Sphere {
     material: Material,
 }
 
+#[derive(Clone)]
 struct Ray {
     position: Vec3,
     direction: Vec3,
@@ -24,27 +30,54 @@ struct HitInfo {
     material: Material,
 }
 
-const SPHERES: [Sphere; 2] = [
+const SPHERES: [Sphere; 4] = [
     Sphere {
-        position: Vec3::new(0.0, 0.0, -15.0),
+        position: Vec3::new(0.0, 5.0, -15.0),
         radius: 5.0,
         material: Material {
             colour: Vec3::new(0.8, 0.2, 0.2),
+            emission_colour: Vec3::ZERO,
+            emission_strength: 0.0
         },
     },
     Sphere {
-        position: Vec3::new(-10.0, 0.0, -15.0),
-        radius: 3.0,
+        position: Vec3::new(0.0, -5.0, -15.0),
+        radius: 5.0,
         material: Material {
             colour: Vec3::new(0.2, 0.2, 0.8),
+            emission_colour: Vec3::ZERO,
+            emission_strength: 0.0
+        },
+    },
+    Sphere {
+        position: Vec3::new(25.0, 0.0, -15.0),
+        radius: 20.0,
+        material: Material {
+            colour: Vec3::new(0.2, 0.8, 0.2),
+            emission_colour: Vec3::ZERO,
+            emission_strength: 0.0
+        },
+    },
+    Sphere {
+        position: Vec3::new(-50.0, 0.0, -12.0),
+        radius: 20.0,
+        material: Material {
+            colour: Vec3::ZERO,
+            emission_colour: Vec3::ONE,
+            emission_strength: 10.0
         },
     },
 ];
 
+const MAX_BOUNCE: u32 = 20;
+const RAYS: u32 = 50;
+
+
 fn main() {
     // let resolution = UVec2::new(3840, 2160);
-    // let resolution = UVec2::new(1920, 1080);
-    let resolution = UVec2::new(1280, 720);
+    let resolution = UVec2::new(1920, 1080);
+    // let resolution = UVec2::new(1280, 720);
+    // let resolution = UVec2::new(400, 300);
     // let resolution = UVec2::new(100, 100);
 
     let aspec_ratio = resolution.x as f32 / resolution.y as f32;
@@ -64,24 +97,47 @@ fn main() {
             direction: aspect_position.extend(0.0) - camera_position,
         };
 
-        let hit = ray_collision(ray);
+        let mut total_light = Vec3::ZERO;
 
-        let colour = match hit {
-            Some(hit_info) => {
-                // hit_info.normal * 0.5 + 0.5
-                hit_info.material.colour
-            }
-            None => Vec3::ZERO,
-        };
+        for _ in 0..RAYS {
+           total_light += trace(&ray);
+        }
+    
+        let colour = total_light / RAYS as f32;
 
         let rgb = colour * 255.0;
         *pixel = Rgb([rgb.x as u8, rgb.y as u8, rgb.z as u8]);
+        
+        let percent = (x as f32 + y as f32 * resolution.x as f32) / (resolution.x as f32 * resolution.y as f32) * 100.0;
+        println!("Percent: {:.1}%", percent);
     }
 
     image.save("image.png").unwrap();
 }
 
-fn ray_collision(ray: Ray) -> Option<HitInfo> {
+fn trace(ray: &Ray) -> Vec3 {
+    let mut ray = ray.clone();
+    let mut incomming_light = Vec3::ZERO;
+    let mut ray_colour = Vec3::ONE;
+
+    for _ in 0..MAX_BOUNCE {
+        if let Some(hit_info) = ray_collision(&ray) {
+            ray.position = hit_info.hit_position;
+            ray.direction = random_hemisphere_direction(hit_info.normal);
+
+            let emitted_light = hit_info.material.emission_colour * hit_info.material.emission_strength;
+            incomming_light += emitted_light * ray_colour;
+
+            ray_colour *= hit_info.material.colour;
+        } else {
+            break;
+        };
+    }
+
+    incomming_light
+}
+
+fn ray_collision(ray: &Ray) -> Option<HitInfo> {
     SPHERES
         .into_iter()
         .map(|sphere| ray_sphere(&ray, &sphere))
@@ -121,10 +177,22 @@ fn ray_sphere(ray: &Ray, sphere: &Sphere) -> Option<HitInfo> {
     None
 }
 
-// fn random_normal_distribution() -> f32 {
+fn random_normal_distribution() -> f32 {
+    let theta: f32 = 2.0 * PI * random::<f32>();
+    let rho = (-2.0 * random::<f32>().log2()).sqrt();
+    rho * theta.cos()
+}
 
-// }
+fn random_direction() -> Vec3 {
+    Vec3::new(
+        random_normal_distribution(),
+        random_normal_distribution(),
+        random_normal_distribution(),
+    )
+    .normalize()
+}
 
-// fn random_direction() -> Vec3 {
-
-// }
+fn random_hemisphere_direction(normal: Vec3) -> Vec3 {
+    let dir = random_direction();
+    dir * normal.dot(dir).signum()
+}
