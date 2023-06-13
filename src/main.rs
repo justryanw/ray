@@ -1,16 +1,84 @@
+use glam::{IVec2, UVec2, Vec2, Vec3};
 use image::{Rgb, RgbImage};
 
-fn main() {
-    let (width, height) = (100, 100);
+struct Sphere {
+    position: Vec3,
+    radius: f32,
+}
 
-    let mut image = RgbImage::new(width, height);
+struct Ray {
+    position: Vec3,
+    direction: Vec3,
+}
+
+struct HitInfo {
+    distance: f32,
+    hit_position: Vec3,
+    normal: Vec3,
+}
+
+fn main() {
+    let resolution = UVec2::new(1280, 720);
+    let aspec_ratio = resolution.x as f32 / resolution.y as f32;
+
+    let sphere = Sphere {
+        position: Vec3::new(0.0, 0.0, 15.0),
+        radius: 5.0,
+    };
+        
+    let camera_position = Vec3::new(0.0, 0.0, -1.0);
+
+    let mut image = RgbImage::new(resolution.x, resolution.y);
 
     for (x, y, pixel) in image.enumerate_pixels_mut() {
-        let r = (x as f32 / (width - 1) as f32 * 255.0) as u8;
-        let g = (y as f32 / (height - 1) as f32 * 255.0) as u8;
+        let screen_position = UVec2::new(x, y);
+        let normal_position = (screen_position.as_vec2() + 0.5) / resolution.as_vec2();
+        let centerd_position = normal_position - 0.5;
+        let aspect_position = centerd_position * Vec2::new(aspec_ratio, 1.0);
 
-        *pixel = Rgb([r, g, 0]);
+
+        let ray = Ray {
+            position: camera_position,
+            direction: aspect_position.extend(0.0) - camera_position,
+        };
+
+        let hit = ray_sphere(ray, &sphere).is_some();
+
+        if hit {
+            // println!("hit");
+        }
+
+        let colour = match hit {
+            true => 255u8,
+            false => 0u8,
+        };
+
+        *pixel = Rgb([colour, colour, colour]);
     }
 
     image.save("image.png").unwrap();
+}
+
+fn ray_sphere(ray: Ray, sphere: &Sphere) -> Option<HitInfo> {
+    let offset_ray_origin = ray.position - sphere.position;
+
+    let a = ray.direction.dot(ray.direction);
+    let b = 2.0 * offset_ray_origin.dot(ray.direction);
+    let c = offset_ray_origin.dot(offset_ray_origin) - sphere.radius * sphere.radius;
+    let discriminant = b * b - 4.0 * a * c;
+
+    if discriminant >= 0.0 {
+        let distance = (-b - discriminant.sqrt()) / (2.0 * a);
+
+        if distance >= 0.0 {
+            let hit_position = ray.position + ray.direction * distance;
+            return Some(HitInfo {
+                distance,
+                hit_position,
+                normal: (hit_position - sphere.position).normalize(),
+            });
+        }
+    }
+
+    None
 }
