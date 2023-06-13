@@ -1,4 +1,4 @@
-use glam::{IVec2, UVec2, Vec2, Vec3};
+use glam::{UVec2, Vec2, Vec3};
 use image::{Rgb, RgbImage};
 
 struct Sphere {
@@ -18,42 +18,45 @@ struct HitInfo {
 }
 
 fn main() {
+    // let resolution = UVec2::new(3840, 2160);
+    // let resolution = UVec2::new(1920, 1080);
     let resolution = UVec2::new(1280, 720);
+    // let resolution = UVec2::new(100, 100);
+
     let aspec_ratio = resolution.x as f32 / resolution.y as f32;
 
     let sphere = Sphere {
-        position: Vec3::new(0.0, 0.0, 15.0),
+        position: Vec3::new(0.0, 0.0, -15.0),
         radius: 5.0,
     };
-        
-    let camera_position = Vec3::new(0.0, 0.0, -1.0);
+
+    let camera_position = Vec3::new(0.0, 0.0, 1.0);
 
     let mut image = RgbImage::new(resolution.x, resolution.y);
 
     for (x, y, pixel) in image.enumerate_pixels_mut() {
-        let screen_position = UVec2::new(x, y);
+        let screen_position = UVec2::new(x, resolution.y - y);
         let normal_position = (screen_position.as_vec2() + 0.5) / resolution.as_vec2();
         let centerd_position = normal_position - 0.5;
         let aspect_position = centerd_position * Vec2::new(aspec_ratio, 1.0);
-
 
         let ray = Ray {
             position: camera_position,
             direction: aspect_position.extend(0.0) - camera_position,
         };
 
-        let hit = ray_sphere(ray, &sphere).is_some();
-
-        if hit {
-            // println!("hit");
-        }
+        let hit = ray_sphere(ray, &sphere);
 
         let colour = match hit {
-            true => 255u8,
-            false => 0u8,
+            Some(hit_info) => {
+                hit_info.normal * 0.5 + 0.5
+            },
+            None => Vec3::ZERO,
         };
 
-        *pixel = Rgb([colour, colour, colour]);
+
+        let rgb = colour * 255.0;
+        *pixel = Rgb([rgb.x as u8, rgb.y as u8, rgb.z as u8]);
     }
 
     image.save("image.png").unwrap();
