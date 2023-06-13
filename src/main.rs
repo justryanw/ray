@@ -1,9 +1,15 @@
 use glam::{UVec2, Vec2, Vec3};
 use image::{Rgb, RgbImage};
 
+#[derive(Clone)]
+struct Material {
+    colour: Vec3,
+}
+
 struct Sphere {
     position: Vec3,
     radius: f32,
+    material: Material,
 }
 
 struct Ray {
@@ -15,7 +21,25 @@ struct HitInfo {
     distance: f32,
     hit_position: Vec3,
     normal: Vec3,
+    material: Material,
 }
+
+const SPHERES: [Sphere; 2] = [
+    Sphere {
+        position: Vec3::new(0.0, 0.0, -15.0),
+        radius: 5.0,
+        material: Material {
+            colour: Vec3::new(0.8, 0.2, 0.2),
+        },
+    },
+    Sphere {
+        position: Vec3::new(-10.0, 0.0, -15.0),
+        radius: 3.0,
+        material: Material {
+            colour: Vec3::new(0.2, 0.2, 0.8),
+        },
+    },
+];
 
 fn main() {
     // let resolution = UVec2::new(3840, 2160);
@@ -24,11 +48,6 @@ fn main() {
     // let resolution = UVec2::new(100, 100);
 
     let aspec_ratio = resolution.x as f32 / resolution.y as f32;
-
-    let sphere = Sphere {
-        position: Vec3::new(0.0, 0.0, -15.0),
-        radius: 5.0,
-    };
 
     let camera_position = Vec3::new(0.0, 0.0, 1.0);
 
@@ -45,15 +64,16 @@ fn main() {
             direction: aspect_position.extend(0.0) - camera_position,
         };
 
-        let hit = ray_sphere(ray, &sphere);
+
+        let hit = ray_collision(ray);
 
         let colour = match hit {
             Some(hit_info) => {
-                hit_info.normal * 0.5 + 0.5
-            },
+                // hit_info.normal * 0.5 + 0.5
+                hit_info.material.colour
+            }
             None => Vec3::ZERO,
         };
-
 
         let rgb = colour * 255.0;
         *pixel = Rgb([rgb.x as u8, rgb.y as u8, rgb.z as u8]);
@@ -62,7 +82,22 @@ fn main() {
     image.save("image.png").unwrap();
 }
 
-fn ray_sphere(ray: Ray, sphere: &Sphere) -> Option<HitInfo> {
+fn ray_collision(ray: Ray) -> Option<HitInfo> {
+    SPHERES
+        .into_iter()
+        .map(|sphere| ray_sphere(&ray, &sphere))
+        .fold(None, |acc: Option<HitInfo>, optional_hit| {
+            let Some(closest_hit) = &acc else { return optional_hit };
+            if let Some(hit_info) = &optional_hit {
+                if hit_info.distance < closest_hit.distance {
+                    return optional_hit;
+                }
+            }
+            acc
+        })
+}
+
+fn ray_sphere(ray: &Ray, sphere: &Sphere) -> Option<HitInfo> {
     let offset_ray_origin = ray.position - sphere.position;
 
     let a = ray.direction.dot(ray.direction);
@@ -79,6 +114,7 @@ fn ray_sphere(ray: Ray, sphere: &Sphere) -> Option<HitInfo> {
                 distance,
                 hit_position,
                 normal: (hit_position - sphere.position).normalize(),
+                material: sphere.material.clone(),
             });
         }
     }
