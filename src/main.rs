@@ -64,7 +64,6 @@ fn main() {
             direction: aspect_position.extend(0.0) - camera_position,
         };
 
-
         let hit = ray_collision(ray);
 
         let colour = match hit {
@@ -121,3 +120,11 @@ fn ray_sphere(ray: &Ray, sphere: &Sphere) -> Option<HitInfo> {
 
     None
 }
+
+// fn random_normal_distribution() -> f32 {
+
+// }
+
+// fn random_direction() -> Vec3 {
+
+// }
